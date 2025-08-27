@@ -1,0 +1,26 @@
+:root{ --panel:#0f1520; --line:#1b2330; --text:#e8eef7; }
+html,body{height:100%}
+body{margin:0;background:#77a8ff;color:var(--text);font:14px/1.2 system-ui,-apple-system}
+#hud2dbg,
+#hud2d{
+  position:absolute; inset:0;
+  pointer-events:none;
+  image-rendering: pixelated;
+}
+#hud2dbg{ z-index:1; }  /* 배경 */
+#hud2d  { z-index:2; }  /* 텍스트 */
+#app{ position:fixed; inset:0; overflow:hidden }  /* 이미 있으나, 겹침 보장 */
+canvas{display:block}
+
+/* 하단 UI 패널 */
+.hud{
+  position:fixed; left:0; right:0; bottom:0;
+  display:grid; gap:10px; grid-template-columns:repeat(2,1fr);
+  padding:12px 14px; background:#0f1520cc; border-top:1px solid var(--line);
+  backdrop-filter: blur(4px);
+}
+.card{display:flex; flex-direction:column; gap:6px; border:1px solid var(--line);
+      border-radius:10px; padding:10px 12px; background:linear-gradient(180deg,#0e1621,#0b111a)}
+.card label{font-size:12px; opacity:.85}
+.row{display:flex; align-items:center; gap:8px}
+input[type="range"]{width:100%}
