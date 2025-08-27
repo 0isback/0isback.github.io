@@ -21,7 +21,7 @@ const CAM_FACTOR   = 0.48;
 
 const TITLE_TEXT_SCALE = 2.5;
 const INFO_TEXT_SCALE  = 2.5;
-const CAM_TEXT_SCALE   = 2.0;
+const CAM_TEXT_SCALE   = 2.5;
 
 const PANEL_PADDING_X = [15, 15];
 const PANEL_PADDING_Y = [15, 15];
@@ -305,7 +305,7 @@ export async function initHUD(_renderer, _camera, _scene, options = {}) {
     paddingY: [15, 15],
     textScale: CAM_TEXT_SCALE,
     anchor: 'topright',
-    offsetPx: [15, 5],
+    offsetPx: [25, 5],
     factor: CAM_FACTOR,
     textColor: '#000000'
   });
