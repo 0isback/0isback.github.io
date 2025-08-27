@@ -4,36 +4,36 @@ import { MCFontRenderer } from '../MCFont.js';
 
 let renderer, camera, scene;
 
-// ─── 기준 해상도(비율 유지용) ───────────────────────────────────────
+// ── 기준 해상도(비율 유지) ─────────────────────────────────────────
 const BASE_W = 1280;
 const BASE_H = 720;
 function getUiScale() {
   const cw = Math.max(1, Math.round(renderer?.domElement?.clientWidth  ?? window.innerWidth));
   const ch = Math.max(1, Math.round(renderer?.domElement?.clientHeight ?? window.innerHeight));
-  const s = Math.min(cw / BASE_W, ch / BASE_H);
+  const s  = Math.min(cw / BASE_W, ch / BASE_H);
   return THREE.MathUtils.clamp(s, 0.75, 1.35);
 }
 
-// 상대 스케일
+// 스케일 계수
 const TITLE_FACTOR = 0.52;
 const INFO_FACTOR  = 0.52;
 const CAM_FACTOR   = 0.48;
 
 const TITLE_TEXT_SCALE = 2.5;
-const INFO_TEXT_SCALE  = 2.0;
+const INFO_TEXT_SCALE  = 2.5;
 const CAM_TEXT_SCALE   = 2.0;
 
 const PANEL_PADDING_X = [15, 15];
 const PANEL_PADDING_Y = [15, 15];
 const INFO_LINE_HEIGHT_PX = 40;
 
-// ─── 오버레이 캔버스 & 부모 얻기 ────────────────────────────────────
-let bgCanvas, bgCtx;      // 배경(2D)
-let hudCanvas, font;      // 텍스트(WebGL2)
+// ── 오버레이 캔버스 & 부모 ────────────────────────────────────────
+let bgCanvas, bgCtx;
+let hudCanvas, font;
+let DPR = 1;
 
 function getHudParent() {
   const p = renderer?.domElement?.parentElement || document.getElementById('app') || document.body;
-  // 부모가 position: static이면 absolute 배치가 화면 전체 기준이 되므로 relative 부여
   if (p && getComputedStyle(p).position === 'static') p.style.position = 'relative';
   return p;
 }
@@ -43,19 +43,14 @@ function ensureCanvases(){
   if (!bgCanvas){
     bgCanvas = document.getElementById('hud2dbg') || document.createElement('canvas');
     bgCanvas.id = 'hud2dbg';
-    Object.assign(bgCanvas.style, {
-      position:'absolute', left:'0px', top:'0px', pointerEvents:'none'
-    });
+    Object.assign(bgCanvas.style, { position:'absolute', left:'0px', top:'0px', pointerEvents:'none' });
     parent.appendChild(bgCanvas);
-    bgCtx = bgCanvas.getContext('2d');
-    bgCtx.imageSmoothingEnabled = false;
+    bgCtx = bgCanvas.getContext('2d'); bgCtx.imageSmoothingEnabled = false;
   }
   if (!hudCanvas){
     hudCanvas = document.getElementById('hud2d') || document.createElement('canvas');
     hudCanvas.id = 'hud2d';
-    Object.assign(hudCanvas.style, {
-      position:'absolute', left:'0px', top:'0px', pointerEvents:'none'
-    });
+    Object.assign(hudCanvas.style, { position:'absolute', left:'0px', top:'0px', pointerEvents:'none' });
     parent.appendChild(hudCanvas);
   }
 }
@@ -65,8 +60,10 @@ async function ensureFont(){
   if (!font){
     font = new MCFontRenderer({ canvas: hudCanvas, basePath: './images/font' });
     await font.init();
-    try { font.DPR = 1; } catch {}
   }
+  // 고해상도 텍스트용 DPR 적용
+  DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));   // 필요하면 2→1.5로 낮춰도 OK
+  try { font.DPR = DPR; } catch {}
   resizeOverlayCanvases();
   font.resize();
 }
@@ -75,23 +72,25 @@ function resizeOverlayCanvases(){
   const cw = Math.round(renderer?.domElement?.clientWidth  ?? window.innerWidth);
   const ch = Math.round(renderer?.domElement?.clientHeight ?? window.innerHeight);
 
-  // ★ 렌더러 캔버스의 CSS 크기에 정확히 맞춘다 (100% 금지)
+  // CSS 크기 = 렌더러와 동일 (정확한 px)
   bgCanvas.style.width = hudCanvas.style.width = `${cw}px`;
   bgCanvas.style.height = hudCanvas.style.height = `${ch}px`;
 
-  // ★ 내부 해상도도 CSS px로 1:1
-  if (bgCanvas.width !== cw || bgCanvas.height !== ch){ bgCanvas.width = cw; bgCanvas.height = ch; }
-  if (hudCanvas.width !== cw || hudCanvas.height !== ch){ hudCanvas.width = cw; hudCanvas.height = ch; }
+  // 내부 해상도 = CSS * DPR (고해상도)
+  const W = Math.round(cw * DPR);
+  const H = Math.round(ch * DPR);
+  if (bgCanvas.width !== W || bgCanvas.height !== H){ bgCanvas.width = W; bgCanvas.height = H; }
+  if (hudCanvas.width !== W || hudCanvas.height !== H){ hudCanvas.width = W; hudCanvas.height = H; }
 
-  bgCtx.setTransform(1, 0, 0, 1, 0, 0);
-  bgCtx.clearRect(0,0,cw,ch);
+  // 배경은 CSS좌표로 그리되, 컨텍스트에 DPR 변환을 미리 적용
+  bgCtx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  bgCtx.clearRect(0, 0, cw, ch);
 }
 
-// ─── HUD 블록(타이틀/인포/카메라) ──────────────────────────────────
+// ── HUD 블록 ───────────────────────────────────────────────────────
 function createHudBlock({
   // widthPx: number | (viewportWidthCSS:number)=>number
-  widthPx,
-  lines,
+  widthPx, lines,
   background = true,
   lineHeightPx = 42,
   paddingX = PANEL_PADDING_X,
@@ -106,13 +105,13 @@ function createHudBlock({
   border = false,
   minHeightPx = 90
 }){
-  const normPad2 = (v)=> Array.isArray(v) ? v : [v, v];
-  const [padL, padR] = normPad2(paddingX);
-  const [padT, padB] = normPad2(paddingY);
+  const norm2 = (v)=> Array.isArray(v) ? v : [v, v];
+  const [padL0, padR0] = norm2(paddingX);
+  const [padT0, padB0] = norm2(paddingY);
 
   const state = {
     widthPx, lineHeightPx,
-    paddingX:[padL, padR], paddingY:[padT, padB],
+    paddingX:[padL0, padR0], paddingY:[padT0, padB0],
     textScale, anchor, offsetPx: [...offsetPx], factor, textColor,
     lines: Array.isArray(lines) ? lines : [lines],
     rectCSS: { x:0, y:0, w:0, h:0 },
@@ -123,28 +122,30 @@ function createHudBlock({
     const s = getUiScale();
     const eff = state.factor * s;
 
-    const innerH = Math.max(1, state.lines.length) * state.lineHeightPx
-                 + state.paddingY[0] + state.paddingY[1];
-
-    const minH = state.background ? (state.minHeightPx ?? 0) : 0;
-    const hPx = state.background ? Math.max(minH, innerH) : innerH;
+    // 텍스트와 동일한 정수 계산(단위: CSS px)
+    const padL = Math.round(state.paddingX[0] * eff);
+    const padR = Math.round(state.paddingX[1] * eff);
+    const padT = Math.round(state.paddingY[0] * eff);
+    const padB = Math.round(state.paddingY[1] * eff);
+    const lineStep = Math.round(state.lineHeightPx * eff);
+    const contentH = Math.max(1, state.lines.length) * lineStep;
+    const innerH   = contentH + padT + padB;
+    const minHcss  = state.background ? Math.round((state.minHeightPx ?? 0) * eff) : 0;
+    const hS       = state.background ? Math.max(minHcss, innerH) : innerH;
 
     const widthCSS  = Math.round(renderer.domElement.clientWidth);
     const heightCSS = Math.round(renderer.domElement.clientHeight);
 
-    const baseW = (typeof state.widthPx === 'function')
-      ? state.widthPx(widthCSS)
-      : state.widthPx;
-
-    const wS = baseW * eff;
-    const hS = hPx  * eff;
+    const baseW = (typeof state.widthPx === 'function') ? state.widthPx(widthCSS) : state.widthPx;
+    const wS    = Math.round(baseW * eff);
 
     const [ox, oy] = state.offsetPx;
     let x = ox, y = oy;
     if (state.anchor.includes('right'))  x = widthCSS  - wS - ox;
     if (state.anchor.includes('bottom')) y = heightCSS - hS - oy;
 
-    state.rectCSS = { x, y, w:wS, h:hS };
+    // +1 여유로 배경이 항상 글자보다 크도록
+    state.rectCSS = { x, y, w: wS + 1, h: hS + 1 };
   }
 
   async function setLines(next, { color = state.textColor, scale = state.textScale } = {}){
@@ -166,7 +167,7 @@ function roundRect(ctx, x, y, w, h, r=12){
   ctx.closePath();
 }
 
-// ─── 전역 블록 + 렌더 루틴 ─────────────────────────────────────────
+// ── 전역 블록 + 렌더 ───────────────────────────────────────────────
 let titleBlock, infoBlock, camBlock;
 
 function stackInfoBelowTitle(gap = 10){
@@ -185,41 +186,38 @@ async function redrawOverlay(){
 
   resizeOverlayCanvases();
 
-  // 배경(2D)
+  // 배경(2D) — CSS px 좌표로 그리고 컨텍스트에 DPR 변환이 적용되어 선명함
+  bgCtx.clearRect(0,0, bgCanvas.width / DPR, bgCanvas.height / DPR);
   const drawPanel = (b)=>{
     if (!b || !b.state.background) return;
     const { x,y,w,h } = b.state.rectCSS;
-    const { bgColor, radius, border } = b.state;
-    bgCtx.fillStyle = bgColor;
-    roundRect(bgCtx, x, y, w, h, radius);
+    bgCtx.fillStyle = b.state.bgColor;
+    roundRect(bgCtx, x, y, w, h, b.state.radius);
     bgCtx.fill();
-    if (border) {
+    if (b.state.border) {
       bgCtx.strokeStyle = 'rgba(0,0,0,0.35)';
       bgCtx.lineWidth = 1;
       bgCtx.stroke();
     }
   };
-  const cw = bgCanvas.width, ch = bgCanvas.height;
-  bgCtx.clearRect(0,0,cw,ch);
   drawPanel(titleBlock);
   drawPanel(infoBlock);
   drawPanel(camBlock);
 
-  // 텍스트(WebGL) — CSS px 좌표 그대로 (DPR 곱 X)
+  // 텍스트(WebGL) — 장치픽셀 좌표 사용 (DPR 반영) → 또렷
   const blocks = [titleBlock, infoBlock, camBlock].filter(Boolean);
   let first = true;
   for (const b of blocks){
     const st = b.state;
     const eff = st.factor * getUiScale();
 
-    const px   = (v)=> Math.round(v * eff);
-    const toPx = (v)=> Math.round(v);
+    const px   = (v)=> Math.round(v * eff * DPR);   // 장치픽셀
+    const toPx = (v)=> Math.round(v * DPR);         // CSS px → 장치픽셀
 
     const baseX = toPx(st.rectCSS.x);
     const baseY = toPx(st.rectCSS.y);
 
     const padL = px(st.paddingX[0]);
-    const padR = px(st.paddingX[1]);
     const padT = px(st.paddingY[0]);
     const padB = px(st.paddingY[1]);
     const startX = baseX + padL;
@@ -249,7 +247,7 @@ async function redrawOverlay(){
   }
 }
 
-// ─── 공개 API ──────────────────────────────────────────────────────
+// ── 공개 API ───────────────────────────────────────────────────────
 export async function initHUD(_renderer, _camera, _scene, options = {}) {
   const { infoInitialLines } = options;
   renderer = _renderer; camera = _camera; scene = _scene;
@@ -317,13 +315,15 @@ export async function initHUD(_renderer, _camera, _scene, options = {}) {
 
 export function onHUDResize() {
   if (!renderer) return;
+  DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  try { if (font) font.DPR = DPR; } catch {}
   resizeOverlayCanvases();
 
   titleBlock?.layout();
   stackInfoBelowTitle(10);
   camBlock?.layout();
 
-  if (font) { try { font.DPR = 1; } catch {} font.resize(); }
+  if (font) font.resize();
   redrawOverlay();
 }
 
