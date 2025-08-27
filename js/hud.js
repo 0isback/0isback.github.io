@@ -202,7 +202,7 @@ async function redrawOverlay(){
   };
   drawPanel(titleBlock);
   drawPanel(infoBlock);
-  drawPanel(camBlock);
+  //drawPanel(camBlock);
 
   // 텍스트(WebGL) — 장치픽셀 좌표 사용 (DPR 반영) → 또렷
   const blocks = [titleBlock, infoBlock, camBlock].filter(Boolean);
