@@ -257,7 +257,7 @@ export async function initHUD(_renderer, _camera, _scene, options = {}) {
   const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
 
   titleBlock = createHudBlock({
-    widthPx: (vw)=> clamp(vw * 0.42, 420, 550),
+    widthPx: (vw)=> clamp(vw * 0.42, 420, 450),
     lines: '마인크래프트 천구 시뮬레이터',
     background: true,
     lineHeightPx: 40,
