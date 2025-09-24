@@ -1,4 +1,4 @@
-export const FIXED_LAT_DEG = 38;
+export const FIXED_LAT_DEG = 36;
 export const MIDDAY_OF_MONTH = [15,46,74,105,135,166,196,227,258,288,319,349];
 
 export const R = 100;
