@@ -257,8 +257,8 @@ export async function initHUD(_renderer, _camera, _scene, options = {}) {
   const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
 
   titleBlock = createHudBlock({
-    widthPx: (vw)=> clamp(vw * 0.42, 420, 720),
-    lines: '6학년 2학기 과학 2단원. 계절의 변화',
+    widthPx: (vw)=> clamp(vw * 0.42, 420, 650),
+    lines: '마인크래프트 천구 시뮬레이터',
     background: true,
     lineHeightPx: 40,
     paddingX: [15, 15],
